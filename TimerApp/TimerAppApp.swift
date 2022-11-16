@@ -11,7 +11,8 @@ import SwiftUI
 struct TimerAppApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            let timerVM = TimerViewModelImplementation(worker: TimerDatabase())
+            TimerView(vm: timerVM)
         }
     }
 }
