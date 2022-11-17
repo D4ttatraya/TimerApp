@@ -1,7 +1,7 @@
 # TimerApp
 
 This is simple timer app for iOS.  
-It let's select the duration of timer and then pause/resume and stop it. It fires notification upon finishing timer if app is in background.
+It let us select the duration of timer and then pause/resume and stop it. It fires notification upon finishing timer if app is in background.
 
 <p align="left">
 <img src="https://user-images.githubusercontent.com/14185009/202363161-f304d574-561d-4d9d-8e25-1eba2252337c.png" width="200">
