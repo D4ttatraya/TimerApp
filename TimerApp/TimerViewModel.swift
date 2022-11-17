@@ -7,97 +7,116 @@
 
 import Foundation
 
-enum TimerState: Equatable {
-    case stopped
-    case active(Date)
-    case paused(Float)
-}
-
 protocol TimerViewModel: ObservableObject {
     var time: String { get }
     var timerCompletion: Float { get }
-    var state: TimerState { get }
+    var timerModel: TimerModel { get }
     var showTimerCompletionAlert: Bool { get set }
     func startTimer(minutes: Float)
     func pauseTimer()
     func resumeTimer()
     func stopTimer()
+    func pauseUIUpdates()
+    func resumeUIUpdates()
 }
 
 let DefaultTimerMinutes: Float = 5.0
 
-class TimerViewModelImplementation: TimerViewModel {
+class TimerViewModelClass: TimerViewModel {
     
-    @Published var state: TimerState = .stopped
+    @Published var timerModel = TimerModel(duration: 0, state: .stopped)
     @Published var showTimerCompletionAlert = false
     @Published var timerCompletion = DefaultTimerMinutes
     @Published var time = "\(DefaultTimerMinutes):00"
     
-    init(worker: TimerWorker?) {
-        self.worker = worker
-        
-        if let time = worker?.getTime() {
-            self.initialSeconds = time.initialTime
-            self.state = .paused(time.timeRemaining)
-            self.updateTimer(timeRemaining: time.timeRemaining)
-        }
-        worker?.clearTime()
+    init(timerData: TimerData?, countDown: CountDown?) {
+        self.timerData = timerData
+        self.countDown = countDown
+        self.refreshTimerStatus()
     }
     
     func startTimer(minutes: Float) {
-        self.initialSeconds = minutes * 60
-        guard let endDate = Calendar.current.date(byAdding: .minute, value: Int(minutes), to: Date()) else {
+        let seconds = minutes * 60
+        guard let endDate = Calendar.current.date(byAdding: .second, value: Int(seconds), to: Date()) else {
             return
         }
-        self.state = .active(endDate)
+        self.timerModel = TimerModel(duration: seconds,
+                                     state: .active(endDate: endDate))
+        self.timerData?.saveAndSchedule(timer: self.timerModel)
         self.startUpdatingTimer()
     }
     
     func pauseTimer() {
-        guard case .active(let endDate) = self.state  else {
+        guard case .active(let endDate) = self.timerModel.state else {
             return
         }
-        self.timer?.invalidate()
+        self.countDown?.stop()
         //save current progress and initialSeconds in DB
         let diff = endDate.timeIntervalSince1970 - Date().timeIntervalSince1970
-        let time = (self.initialSeconds, Float(diff))
-        self.worker?.save(time: time)
-        self.state = .paused(Float(diff))
+        self.timerModel.state = .paused(timeRemaining: Float(diff))
+        self.timerData?.pause(timer: self.timerModel)
     }
     
     func resumeTimer() {
-        guard case .paused(let timeRemaining) = self.state  else {
+        guard case .paused(let timeRemaining) = self.timerModel.state  else {
             return
         }
         guard let endDate = Calendar.current.date(byAdding: .second, value: Int(timeRemaining), to: Date()) else {
             return
         }
-        self.state = .active(endDate)
+        self.timerModel.state = .active(endDate: endDate)
+        self.timerData?.saveAndSchedule(timer: self.timerModel)
         self.startUpdatingTimer()
     }
     
     func stopTimer() {
-        self.state = .stopped
+        self.timerData?.removeTimer()
+        self.timerModel.state = .stopped
+    }
+    
+    func pauseUIUpdates() {
+        self.countDown?.stop()
+    }
+    
+    func resumeUIUpdates() {
+        self.refreshTimerStatus()
     }
     
     //MARK: - Private -
-    private let worker: TimerWorker?
-    private var initialSeconds: Float = 0.0
-    private var timer: Timer?
+    private let timerData: TimerData?
+    private var countDown: CountDown?
+    
+    private func refreshTimerStatus() {
+        guard let timer = self.timerData?.getTimer() else {
+            return
+        }
+        self.timerModel = timer
+        if case .active(let endDate) = timer.state {
+            let diff = endDate.timeIntervalSince1970 - Date().timeIntervalSince1970
+            if diff <= 0 {
+                self.timerModel.state = .stopped
+                self.timerData?.removeTimer()
+            } else {
+                self.startUpdatingTimer()
+            }
+        } else if case .paused(let timeRemaining) = timer.state {
+            self.updateTimer(timeRemaining: timeRemaining)
+        }
+    }
     
     private func startUpdatingTimer() {
-        self.timer?.invalidate()
-        self.timer = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { _ in
-            guard case .active(let endDate) = self.state  else {
-                return
-            }
+        guard case .active(let endDate) = self.timerModel.state  else {
+            return
+        }
+        
+        self.countDown?.start(withTimeInterval: 0.01) { [unowned self] in
             
             let diff = endDate.timeIntervalSince1970 - Date().timeIntervalSince1970
             guard diff > 0 else {
-                self.state = .stopped
+                self.timerModel.state = .stopped
                 self.showTimerCompletionAlert = true
-                self.timer?.invalidate()
-                self.timer = nil
+                self.countDown?.stop()
+                self.timerData?.removeTimer()
                 return
             }
             
@@ -109,7 +128,7 @@ class TimerViewModelImplementation: TimerViewModel {
         let minutes = Int(diff / 60)
         let seconds = diff.truncatingRemainder(dividingBy: 60)
 //        let miliSeconds = Int(diff * 1000)
-        self.timerCompletion = diff / self.initialSeconds
+        self.timerCompletion = diff / self.timerModel.duration
         self.time = String(format:"%d:%.3f", minutes, seconds)
     }
 }

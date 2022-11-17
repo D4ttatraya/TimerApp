@@ -17,7 +17,7 @@ struct TimerView<ViewModel>: View where ViewModel: TimerViewModel {
     var body: some View {
         VStack {
             Group {
-                if vm.state == .stopped {
+                if vm.timerModel.state == .stopped {
                     VStack {
                         Slider(value: $timerMinutes, in: 1...20, step: 1)
                         
@@ -44,21 +44,21 @@ struct TimerView<ViewModel>: View where ViewModel: TimerViewModel {
                         .font(Font.title2)
                         .padding()
                         .background(Color.gray.opacity(0.1))
-                        .foregroundColor(vm.state == .stopped ? .gray : .primary)
+                        .foregroundColor(vm.timerModel.state == .stopped ? .gray : .primary)
                         .cornerRadius(10)
                 }
-                .disabled(vm.state == .stopped)
+                .disabled(vm.timerModel.state == .stopped)
                 
                 Spacer().frame(width: 40)
                 
                 Button {
-                    switch vm.state {
+                    switch vm.timerModel.state {
                     case .stopped: vm.startTimer(minutes: self.timerMinutes)
                     case .active(_): vm.pauseTimer()
                     case .paused(_): vm.resumeTimer()
                     }
                 } label: {
-                    Text(vm.state.mainButtonTitle)
+                    Text(vm.timerModel.state.mainButtonTitle)
                         .font(Font.title2)
                         .padding()
                         .background(Color.green.opacity(0.2))
@@ -67,16 +67,14 @@ struct TimerView<ViewModel>: View where ViewModel: TimerViewModel {
                 }
             }
         }
-        .alert("Timer done!", isPresented: $vm.showTimerCompletionAlert) {
+        .alert("Timer Done ⏰", isPresented: $vm.showTimerCompletionAlert) {
             Button("Okay", role: .cancel) {}
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .inactive {
-                print("inactive")
-                vm.pauseTimer()
+                vm.pauseUIUpdates()
             } else if newPhase == .active {
-                print("active")
-                vm.resumeTimer()
+                vm.resumeUIUpdates()
             }
         }
     }
@@ -94,6 +92,6 @@ fileprivate extension TimerState {
 
 struct TimerView_Previews: PreviewProvider {
     static var previews: some View {
-        TimerView(vm: TimerViewModelImplementation(worker: nil))
+        TimerView(vm: TimerViewModelClass(timerData: nil, countDown: CountDownWorker()))
     }
 }

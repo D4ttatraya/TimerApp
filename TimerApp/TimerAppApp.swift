@@ -11,7 +11,7 @@ import SwiftUI
 struct TimerAppApp: App {
     var body: some Scene {
         WindowGroup {
-            let timerVM = TimerViewModelImplementation(worker: TimerDatabase())
+            let timerVM = TimerViewModelClass(timerData: TimerDataWorker(), countDown: CountDownWorker())
             TimerView(vm: timerVM)
         }
     }
