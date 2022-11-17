@@ -19,7 +19,8 @@ It also let us pause the timer, upon pausing it persists the current state of ti
 ### Tech Specs
 XCode 14.1  
 UI- SwiftUI  
-Min Supported iOS 15
+Min Supported is iOS 15
+Design Pattern/Architecture is MVVM
 
 ### Limitations
 This app can run only one timer at a time.  
